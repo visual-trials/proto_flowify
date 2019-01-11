@@ -1,1 +1,1 @@
-# proto_flowify
+# Flowify prototype 
