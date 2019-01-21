@@ -63,7 +63,7 @@ var containerTypeProperties = {
         showContainerText: true,
         showHeader: false,
         containerTextCenterVertically: true,
-        headerTextCenterHorizontally: false,
+        containerTextCenterHorizontally: false,
         connectOutgoingTo: "right",
         connectIncomingTo: "left",
         hasPadding: false,

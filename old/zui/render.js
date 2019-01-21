@@ -1176,9 +1176,9 @@ ZUI.render = function () {
             var fontColor = containerProperties.containerTextColor
 
             // FIXME: make size of font (that is: percentage of (left-over) height in container)
-            var labelVerticalMargin = height * 0.40 // (height - labelTextHeight) / 2
+            var labelVerticalMargin = (height - labelTextHeight) / 2
             // FIXME: what should we do here?
-            var labelHorizontalMargin = labelTextHeight / 4// labelVerticalMargin + 6 // TODO: maybe independent? Larger?
+            var labelHorizontalMargin = labelVerticalMargin + 6 // TODO: maybe independent? Larger?
 
             // FIXME: this is only the case if the text is one line and fills the vertical height of the container...
             var fontHeight = height - 2 * labelVerticalMargin
