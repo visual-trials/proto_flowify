@@ -1,0 +1,10 @@
+.bashrc
+.bash_history
+.bash_logout
+.viminfo
+.profile
+
+.phpstorm_helpers
+.cache
+
+flow_static/lib
