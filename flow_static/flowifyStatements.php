@@ -606,6 +606,11 @@ function buildPathBackwards($laneElement, $variableName, $connectionType = null)
     if (!$laneElement->canHaveChildren) {
         logLine("We are at element: " . $laneElement->id);
         
+        // @Refactor: it seems this happens if we walk back the 'statements' inside a block (lane). If a statement is an Assignment of a variable,
+        //            we find that assignment right here. But these Assign-expression-statements are not in the flowElements as statements (control flow elements).
+        //            Should we not instead search backwards through flowElements of type 'control-flow statement/element' inside a block of statements? And then
+        //            check if we find an assignment statement?
+        
         // The labeElement is not a lane, so we check if it is the variable we are searching for
         if ($laneElement->isVariable === $variableName) {
             logLine("Found variable $variableName as element:" . $laneElement->id);
@@ -620,6 +625,13 @@ function buildPathBackwards($laneElement, $variableName, $connectionType = null)
             if (array_key_exists($variableName, $laneElement->varsInScopeChanged)) {
                 // The variable has been changed inside the lane, so we should be able to find it there
                 
+                // @Refactor: it seems this is wrong. When we try to find a variable-assignment from a usage, and after that usage (in the same laneElement) there
+                //            is also an assignment of the same variable, we will find that *future* assignment if we start with the lastChildId of the laneElement!
+                //            Instead, start with the control-flow element where the variable-usage resides (a 'laneElement' if you will) and search backwards from there (so using previousId(s) instead)
+                //            One remark: is it possible for a variable to be assigned inside and expression, where a later expression (inside the same statement) it is used?
+                //            If so, we should instead search backwards from the variable-usage backwards to parent-expressions until we reach the statement.
+                //            Question: why didn't we do that here in the first place? Shouldn't we always use previousId(s)? Or are those unreliable for expressions?
+                
                 // We start with the last child in the lane
                 if ($laneElement->lastChildId !== null) {
                     $variableElement = buildPathBackwards($flowElements[$laneElement->lastChildId], $variableName, $connectionType);
@@ -631,6 +643,20 @@ function buildPathBackwards($laneElement, $variableName, $connectionType = null)
                 }
                  
             }
+            
+            // @Refactor: is it not better to *first* determine all control-flow and attach/link all control-flow elements together (including assymetric ones)
+            //            and *then* do data-flow analysis: searching for an variable-assignment backwards through these control-flow elements.
+            //            That way we don't need openEndings here anymore, since all control-flow elements are already linked.
+            //            Important note: when there is a function that throws an exception, its throw should be catched by the caller of that function.
+            //            This means that the function-call-expressions should be part of the control-flow building. And that means *all* expressions should be part
+            //            of control-flow building.
+            //            Note that each function-implementation (which is duplicated for each function-call) will have a throw-link to the catcher of its own function-caller.
+            //            This measn duplication for each function-implementation is unavoidable (but not desirable). *Unless* we point from the catcher back to the thrower. Then
+            //            we might be able to re-use the function-implementation. But in order not to duplicate de flowification of the function-implementation, you also
+            //            have to somehow link control- and data-flow lines from and to that implementation, without having the implementation refer to the caller/catcher/returner. This seems kinda hard.
+            //            Its just that the variable-usages (and therefore data-flow *links*) should be added *after* adding control-flow elements (mainly statements and function-calls, trhows)
+            //            and all expression-elements.
+            
             // FIXME: WORKAROUND using openEndings!! 
             //        Maybe it's better to mark only this lane (and not its parents) 
             //        as 'un-joined' or 'joined-later' or 'assymetricly-joined'
@@ -646,6 +672,10 @@ function buildPathBackwards($laneElement, $variableName, $connectionType = null)
                     // return null;
                 }
             }
+            // @Refactor: the logic should (in *symetric* cases) always be: check in all previous control-flow blocks if the variable has changed. If it has in at least one, walk through all of them.
+            //            the exception to this logic is, when we *should* have been 2 control-flow elements/block in our previous-list, but one is 'broken-off' (due to a 'continue', 'break', 'return', 'throw').
+            //            In that case, we *always* want to walk through the one that is left over. 
+            //            Note that we check this now by checking 'canJoin' (meaning it was *originally* a joining element), but when you count the number of previous elements, we see only 1.
             else if ($laneElement->canJoin) {
                 logLine("We can join");
                 
@@ -694,10 +724,14 @@ function buildPathBackwards($laneElement, $variableName, $connectionType = null)
                         //        to find a previous (or parent) to build from.
                         //        There is probably a more robust way of doing this.
                         
+                        // @Refactor: when we do the control-flow analysis, we might want to store the corresponding splitter in the joiner.
+                        
                         $laneElement = $flowElements[$lowestLaneId];
                     }
                 }
                 // TODO: this can happen if (for example) for-loops, where the back-lane has not been connected yet as previous
+                // @Refactor: (see notes above, just above the 'else if (...->canJoin) ') it seems that this *also* happens when one of the previousIds is 'broken-off'. For example an ifElse (or ifThen) where the other ifElse/Then has a 'continue' of 'break'). 
+                //            So the TODO above is incomplete. Also the name 'leftLane' is incorrect.
                 else if (count($laneElement->previousIds) === 1) {
                     $leftLaneId = $laneElement->previousIds[0];
                     $leftLane = $flowElements[$leftLaneId];
